@@ -63,31 +63,8 @@ void run_challenge(Table& table, string challenge_filename){
 		challenge.push_back({addr, next_hop});
 	}
 
-	int failed = 0;
-	int success = 0;
-	//DXR lpm(table);
 	Naive lpm(table);
-	//lpm.print_expansion();
-	//lpm.print_tables();
-	clock_t start = clock();
-	for(auto& a : challenge){
-		uint32_t res = lpm.route(a.first);
-		if(res != a.second){
-			cout << "Failed IP: " << ip_to_str(a.first) << endl;
-			cout << "Expected : " << ip_to_str(a.second) << endl;
-			cout << "Got      : " << ip_to_str(res) << endl << endl;
-			failed++;
-		} else {
-			success++;
-		}
-	}
-	clock_t end = clock();
-
-	cerr << "Lookups took " << (1.0*(end-start)) / CLOCKS_PER_SEC << " seconds" << endl;
-
-	cout << "Successful lookups: " << success << endl;
-	cout << "Failed lookups: " << failed << endl;
-
+	lpm.route_challenge(challenge);
 };
 
 int main(int argc, char** argv){

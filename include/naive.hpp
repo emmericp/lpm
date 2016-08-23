@@ -15,6 +15,7 @@ public:
 	Naive(Table& table);
 
 	uint32_t route(uint32_t);
+	int route_challenge(list<pair<uint32_t, uint32_t>>& challenge);
 };
 
 #endif /*__NAIVE_HPP__*/
