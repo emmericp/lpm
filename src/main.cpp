@@ -17,6 +17,7 @@
 #include "naive.hpp"
 //#include "dxr.hpp"
 #include "basicTrie.hpp"
+#include "pcTrie.hpp"
 
 #define CHALLENGE_VERSION 1
 
@@ -98,12 +99,13 @@ void run_challenge(Table& table, string challenge_filename){
 	int success = 0;
 	//DXR lpm(table);
 	//Naive lpm(table);
-	BasicTrie lpm(table);
+	//BasicTrie lpm(table);
+	PCTrie lpm(table);
 	//lpm.print_expansion();
 	//lpm.print_tables();
 	clock_t start = clock();
 
-#if 0
+#if 1
 	// No batching
 	for(unsigned int i=0; i<header.num_entries; i++){
 		uint32_t res = lpm.route(entries[i].addr);
