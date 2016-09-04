@@ -55,6 +55,10 @@ private:
 		struct leaf_entry {
 			uint32_t next_hop;
 			uint32_t prefix_length;
+
+			bool operator < (const leaf_entry& e) const {
+				return prefix_length > e.prefix_length;
+			}
 		};
 
 		std::vector<struct leaf_entry> entries;

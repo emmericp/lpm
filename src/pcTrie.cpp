@@ -25,6 +25,7 @@ void PCTrie::Leaf::pushRoute(uint32_t next_hop, uint32_t prefix_length) {
 	entry.next_hop = next_hop;
 	entry.prefix_length = prefix_length;
 	entries.push_back(entry);
+	sort(entries.begin(), entries.end());
 };
 
 bool PCTrie::Leaf::hasMoreGeneralRoute(uint32_t prefix_length) {
