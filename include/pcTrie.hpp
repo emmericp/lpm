@@ -2,6 +2,9 @@
 #define PCTRIE_HPP
 
 #include <vector>
+#include <string>
+#include <sstream>
+#include <cstdlib>
 
 #include "table.hpp"
 
@@ -65,7 +68,7 @@ private:
 
 	void buildTrie();
 
-	std::string qtree_prev;
+	std::stringstream qtree_prev;
 	void addQtreeSnapshot();
 	std::string getQtreeSnapshot();
 	std::string finalizeQtree(std::string tree);

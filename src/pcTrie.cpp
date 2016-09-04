@@ -102,7 +102,7 @@ void PCTrie::buildTrie() {
 			if((pos < 0) || (pos > 32)){
 				cerr << "PCTrie::buildTrie() something went wrong" << endl;
 				cerr << "\tThe first bit conflict is invalid" << endl;
-				__builtin_trap();
+				abort();
 			}
 			uint32_t mask = PREFIX_MASK(pos);
 
@@ -167,15 +167,15 @@ void PCTrie::buildTrie() {
 			// Sanity check
 			if(new_int->left == NULL){
 				cerr << "PCTrie::buildTrie() new_int->left is NULL" << endl;
-				__builtin_trap();
+				abort();
 			}
 			if(new_int->right == NULL){
 				cerr << "PCTrie::buildTrie() new_int->right is NULL" << endl;
-				__builtin_trap();
+				abort();
 			}
 			if(new_int->parent && (new_int->splitPos <= new_int->parent->splitPos)){
 				cerr << "PCTrie::buildTrie() parent splitPos is >= new splitPos" << endl;
-				__builtin_trap();
+				abort();
 			}
 
 			// Add snapshot for qtree history
@@ -239,45 +239,38 @@ uint32_t PCTrie::route(uint32_t addr){
 };
 
 string PCTrie::getQtreeSnapshot(){
-	string output = "";
-	output += "\
+	stringstream output;
+	output << "\
 %\n\
 	\\hspace{10pt}\n\
 	\\begin{tikzpicture}\n\
 		\\tikzset{every tree node/.style={align=center,anchor=north}}\n";
 
 	// example: \Tree [ [ .0 0\\A [ .1\\B 0 [ .1 0 1\\F ] ] ] [ .1 0\\C [ .1\\D 0\\E 1 ]]]
-	output += "\\Tree ";
-	string references = "";
+	output << "\\Tree ";
+	stringstream references;
 
 	function<void (PCTrie::Internal*)> recursive_helper =
 		[&output,&references,&recursive_helper](Internal* node){
 
-		output += " [ ";
+		output << " [ ";
 
 		// Helper function for later
 		auto leaf_printer = [&output](Leaf* leaf){
-			output += "\\node[draw]("
-				+ to_string((uint64_t) leaf)
-				+ "){" + ip_to_str(leaf->base);
+			output << "\\node[draw](" << leaf << "){" << ip_to_str(leaf->base);
 			for(auto& e : leaf->entries){
-				output += "\\\\";
-				output += ip_to_str(e.next_hop) + ":" + to_string(e.prefix_length);
+				output << "\\\\" << ip_to_str(e.next_hop) << ":" << e.prefix_length;
 			}
-			output += "}; ";
+			output << "};";
 		};
 
 		// node itself
-		output += ".\\node(" + to_string((uint64_t) node) + "){"
-			+ ip_to_str(node->base) + "-" + to_string(node->splitPos) + "}; ";
+		output << ".\\node(" << node << "){" << ip_to_str(node->base)
+			<< "-" << static_cast<int>(node->splitPos) << "};";
 
 		if(node->leaf){
-		// \draw[dashed,->] (root)..controls +(west:1.5) and +(north west:1.2) .. (A);
-			references += "\\draw[semithick,dashed,->] ("
-				+ to_string((uint64_t) node)
-				+ ")..controls +(west:1.5) and +(north west:1.8) .. ("
-				+ to_string((uint64_t) node->leaf)
-				+ ");\n";
+			references << "\\draw[semithick,dashed,->] (" << node
+				<< ")..controls +(west:1.8) and +(north west:1.8) .. (" << node->leaf << ");\n";
 		}
 
 		// left child
@@ -288,7 +281,7 @@ string PCTrie::getQtreeSnapshot(){
 		}
 
 		// Insert line break - otherwise pdflatex breaks
-		output += "\n";
+		output << "\n";
 
 		// right child
 		if(node->right->type == INTERNAL){
@@ -297,7 +290,7 @@ string PCTrie::getQtreeSnapshot(){
 			leaf_printer(static_cast<Leaf*>(node->right));
 		}
 
-		output += " ] ";
+		output << " ] ";
 	};
 
 	// Let's roll
@@ -305,20 +298,20 @@ string PCTrie::getQtreeSnapshot(){
 		recursive_helper(static_cast<Internal*>(root));
 	} else {
 		cerr << "PCTrie::get_qtree() root is just a leaf..." << endl;
-		__builtin_trap();
+		abort();
 	}
 
-	output += references;
+	output << references.str();
 
-	output +="\
+	output <<"\
 	\\end{tikzpicture}\n\
 	\\vspace{10pt}\n\
 %\n";
-	return output;
+	return output.str();
 };
 
 void PCTrie::addQtreeSnapshot(){
-	qtree_prev += getQtreeSnapshot();
+	qtree_prev << getQtreeSnapshot();
 };
 
 string PCTrie::finalizeQtree(string tree){
@@ -345,6 +338,6 @@ string PCTrie::getQtree(){
 };
 
 string PCTrie::getQtreeHistory(){
-	return finalizeQtree(qtree_prev);
+	return finalizeQtree(qtree_prev.str());
 }
 
