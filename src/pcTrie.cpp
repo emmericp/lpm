@@ -245,7 +245,7 @@ uint32_t PCTrie::route(uint32_t addr){
 string PCTrie::get_qtree(){
 	string output = "";
 	output += "\
-\\documentclass[preview]{standalone} \n \
+\\documentclass[preview,border={20pt 20pt 20pt 20pt}]{standalone} \n \
 %\n\
 \\usepackage{tikz}\n\
 \\usepackage{tikz-qtree}\n\
@@ -263,12 +263,13 @@ string PCTrie::get_qtree(){
 
 			// Helper function for later
 			auto leaf_printer = [&output](Leaf* leaf){
+				output += "\\node[draw]{";
 				output += ip_to_str(leaf->base);
 				for(auto& e : leaf->entries){
 					output += "\\\\";
 					output += ip_to_str(e.next_hop) + ":" + to_string(e.prefix_length);
 				}
-				output += " ";
+				output += "}; ";
 			};
 
 			// node itself
@@ -280,6 +281,9 @@ string PCTrie::get_qtree(){
 			} else {
 				leaf_printer(static_cast<Leaf*>(node->left));
 			}
+
+			// Insert line break - otherwise pdflatex breaks
+			output += "\n";
 
 			// right child
 			if(node->right->type == INTERNAL){
