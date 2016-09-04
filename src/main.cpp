@@ -102,7 +102,7 @@ void run_challenge(Table& table, string challenge_filename){
 	//BasicTrie lpm(table);
 #endif
 	PCTrie lpm(table);
-	cout << lpm.get_qtree() << endl;
+	cout << lpm.get_qtree_history() << endl;
 #if 0
 	//lpm.print_expansion();
 	//lpm.print_tables();

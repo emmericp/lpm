@@ -64,10 +64,16 @@ private:
 
 	void buildTrie();
 
+	std::string qtree_prev;
+	void add_qtree_snapshot();
+	std::string get_qtree_snapshot();
+	std::string finalize_qtree(std::string tree);
+
 public:
 	PCTrie(Table& table);
 
 	std::string get_qtree();
+	std::string get_qtree_history();
 
 	uint32_t route(uint32_t);
 	//void routeBatch(uint32_t* in, uint32_t* out, int count);

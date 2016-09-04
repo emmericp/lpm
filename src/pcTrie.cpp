@@ -159,6 +159,9 @@ void PCTrie::buildTrie() {
 				cerr << "PCTrie::buildTrie() parent splitPos is >= new splitPos" << endl;
 				__builtin_trap();
 			}
+
+			// Add snapshot for qtree history
+			add_qtree_snapshot();
 		}
 	}
 };
@@ -217,16 +220,11 @@ uint32_t PCTrie::route(uint32_t addr){
 	return 0xffffffff;
 };
 
-string PCTrie::get_qtree(){
+string PCTrie::get_qtree_snapshot(){
 	string output = "";
 	output += "\
-\\documentclass[preview,border={20pt 20pt 20pt 20pt}]{standalone} \n \
 %\n\
-\\usepackage{tikz}\n\
-\\usepackage{tikz-qtree}\n\
-%\n\
-\\begin{document}\n\
-%\n\
+	\\hspace{10pt}\n\
 	\\begin{tikzpicture}\n\
 		\\tikzset{every tree node/.style={align=center,anchor=north}}\n";
 
@@ -294,10 +292,41 @@ string PCTrie::get_qtree(){
 
 	output += references;
 
-	output +="\n\
+	output +="\
 	\\end{tikzpicture}\n\
-%\n\
-\\end{document}\n";
+	\\vspace{10pt}\n\
+%\n";
 	return output;
 };
+
+void PCTrie::add_qtree_snapshot(){
+	qtree_prev += get_qtree_snapshot();
+};
+
+string PCTrie::finalize_qtree(string tree){
+	string output = "\
+\\documentclass[preview,multi={tikzpicture},border={5pt 5pt 5pt 5pt}]{standalone} \n \
+%\n\
+\\usepackage{tikz}\n\
+\\usepackage{tikz-qtree}\n\
+%\n\
+\\begin{document}\n\
+%\n";
+
+	output += tree;
+
+	output += "\
+%\n\
+\\end{document}\n";
+
+	return output;
+};
+
+string PCTrie::get_qtree(){
+	return finalize_qtree(get_qtree_snapshot());
+};
+
+string PCTrie::get_qtree_history(){
+	return finalize_qtree(qtree_prev);
+}
 
