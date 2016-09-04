@@ -155,11 +155,15 @@ void PCTrie::buildTrie() {
 				cerr << "PCTrie::buildTrie() new_int->right is NULL" << endl;
 				__builtin_trap();
 			}
+			if(new_int->parent && (new_int->splitPos <= new_int->parent->splitPos)){
+				cerr << "PCTrie::buildTrie() parent splitPos is >= new splitPos" << endl;
+				__builtin_trap();
+			}
 		}
 	}
 };
 
-PCTrie::PCTrie(Table& table) : table(table) {
+PCTrie::PCTrie(Table& table) : root(NULL), table(table) {
 	buildTrie();
 };
 
@@ -184,7 +188,7 @@ uint32_t PCTrie::route(uint32_t addr){
 	// cur is a leaf at this position
 	Leaf* cur_leaf = static_cast<Leaf*>(cur);
 
-	// Check for a match, XXX same as below (inline function maybe?)
+	// Check for a match, XXX same as below (lambda function maybe?)
 	for(auto& entry : cur_leaf->entries){
 		uint32_t mask = PREFIX_MASK(entry.prefix_length);
 		if((addr & mask) == cur_leaf->base){
@@ -236,6 +240,70 @@ uint32_t PCTrie::route(uint32_t addr){
 
 	return 0xffffffff;
 #endif
+};
+
+string PCTrie::get_qtree(){
+	string output = "";
+	output += "\
+\\documentclass[preview]{standalone} \n \
+%\n\
+\\usepackage{tikz}\n\
+\\usepackage{tikz-qtree}\n\
+%\n\
+\\begin{document}\n\
+%\n\
+	\\begin{tikzpicture}\n\
+		\\tikzset{every tree node/.style={align=center,anchor=north}}\n";
+
+		// example: \Tree [ [ .0 0\\A [ .1\\B 0 [ .1 0 1\\F ] ] ] [ .1 0\\C [ .1\\D 0\\E 1 ]]]
+		output += "\\Tree ";
+
+		function<void (PCTrie::Internal*)> recursive_helper = [&output,&recursive_helper](Internal* node){
+			output += " [ ";
+
+			// Helper function for later
+			auto leaf_printer = [&output](Leaf* leaf){
+				output += ip_to_str(leaf->base);
+				for(auto& e : leaf->entries){
+					output += "\\\\";
+					output += ip_to_str(e.next_hop) + ":" + to_string(e.prefix_length);
+				}
+				output += " ";
+			};
+
+			// node itself
+			output += "." + ip_to_str(node->base) + "-" + to_string(node->splitPos) + " ";
+
+			// left child
+			if(node->left->type == INTERNAL){
+				recursive_helper(static_cast<Internal*>(node->left));
+			} else {
+				leaf_printer(static_cast<Leaf*>(node->left));
+			}
+
+			// right child
+			if(node->right->type == INTERNAL){
+				recursive_helper(static_cast<Internal*>(node->right));
+			} else {
+				leaf_printer(static_cast<Leaf*>(node->right));
+			}
+
+			output += " ] ";
+		};
+
+		// Let's roll
+		if(root->type == INTERNAL){
+			recursive_helper(static_cast<Internal*>(root));
+		} else {
+			cerr << "PCTrie::get_qtree() root is just a leaf..." << endl;
+			__builtin_trap();
+		}
+
+	output +="\n\
+	\\end{tikzpicture}\n\
+%\n\
+\\end{document}\n";
+	return output;
 };
 
 #if 0
