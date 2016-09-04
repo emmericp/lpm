@@ -66,7 +66,7 @@ void dump_challenge(Table& table, string filename){
 };
 
 void run_challenge(Table& table, string challenge_filename){
-#if 0
+#if 1
 	// read the challenge file
 	int fd = open(challenge_filename.c_str(), 0);
 	challenge_header header;
@@ -102,8 +102,8 @@ void run_challenge(Table& table, string challenge_filename){
 	//BasicTrie lpm(table);
 #endif
 	PCTrie lpm(table);
-	cout << lpm.getQtreeHistory() << endl;
-#if 0
+	//lpm.getQtreeHistory();
+#if 1
 	//lpm.print_expansion();
 	//lpm.print_tables();
 	clock_t start = clock();

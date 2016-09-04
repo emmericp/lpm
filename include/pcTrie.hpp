@@ -8,6 +8,8 @@
 
 #include "table.hpp"
 
+#define PCTRIE_QTREE 0
+
 class PCTrie {
 private:
 
@@ -68,16 +70,20 @@ private:
 
 	void buildTrie();
 
+#if PCTRIE_QTREE == 1
 	std::stringstream qtree_prev;
 	void addQtreeSnapshot();
 	std::string getQtreeSnapshot();
 	std::string finalizeQtree(std::string tree);
+#endif
 
 public:
 	PCTrie(Table& table);
 
+#if PCTRIE_QTREE == 1
 	std::string getQtree();
 	std::string getQtreeHistory();
+#endif
 
 	uint32_t route(uint32_t);
 	//void routeBatch(uint32_t* in, uint32_t* out, int count);

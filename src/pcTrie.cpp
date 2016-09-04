@@ -138,7 +138,7 @@ void PCTrie::buildTrie() {
 			}
 
 			// Do we need to pass the leaf node of the left child up?
-			if((new_int->left->type == INTERNAL) &&
+			if((new_int->left->type == INTERNAL) && static_cast<Internal*>(new_int->left)->leaf &&
 				static_cast<Internal*>(new_int->left)->leaf->hasMoreGeneralRoute(len)){
 				Internal* cur_int = static_cast<Internal*>(new_int->left);
 				new_int->leaf = cur_int->leaf;
@@ -179,7 +179,9 @@ void PCTrie::buildTrie() {
 			}
 
 			// Add snapshot for qtree history
+#if PCTRIE_QTREE == 1
 			addQtreeSnapshot();
+#endif
 		}
 	}
 };
@@ -238,6 +240,8 @@ uint32_t PCTrie::route(uint32_t addr){
 	return 0xffffffff;
 };
 
+#if PCTRIE_QTREE == 1
+
 string PCTrie::getQtreeSnapshot(){
 	stringstream output;
 	output << "\
@@ -270,7 +274,7 @@ string PCTrie::getQtreeSnapshot(){
 
 		if(node->leaf){
 			references << "\\draw[semithick,dashed,->] (" << node
-				<< ")..controls +(west:1.8) and +(north west:1.8) .. (" << node->leaf << ");\n";
+				<< ") .. controls +(west:1.8) and +(north west:1.8) .. (" << node->leaf << ");\n";
 		}
 
 		// left child
@@ -340,4 +344,6 @@ string PCTrie::getQtree(){
 string PCTrie::getQtreeHistory(){
 	return finalizeQtree(qtree_prev.str());
 }
+
+#endif
 
