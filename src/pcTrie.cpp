@@ -20,11 +20,20 @@ PCTrie::Internal::Internal(
 PCTrie::Leaf::Leaf(Internal* parent, uint32_t base) :
 	Node(parent, LEAF, base) {};
 
-void PCTrie::Leaf::push_route(uint32_t next_hop, uint32_t prefix_length) {
+void PCTrie::Leaf::pushRoute(uint32_t next_hop, uint32_t prefix_length) {
 	struct leaf_entry entry;
 	entry.next_hop = next_hop;
 	entry.prefix_length = prefix_length;
 	entries.push_back(entry);
+};
+
+bool PCTrie::Leaf::hasMoreGeneralRoute(uint32_t prefix_length) {
+	for(auto& e : entries){
+		if(e.prefix_length < prefix_length){
+			return true;
+		}
+	}
+	return false;
 };
 
 void PCTrie::buildTrie() {
@@ -39,7 +48,7 @@ void PCTrie::buildTrie() {
 				root = new Leaf(NULL, e.first);
 
 				// Push route into leaf
-				static_cast<Leaf*>(root)->push_route(e.second, len);
+				static_cast<Leaf*>(root)->pushRoute(e.second, len);
 				continue;
 			}
 
@@ -67,7 +76,7 @@ void PCTrie::buildTrie() {
 				// Check if the base matches
 				if(cur->base == e.first){
 					//Push route to leaf
-					static_cast<Leaf*>(cur)->push_route(e.second, len);
+					static_cast<Leaf*>(cur)->pushRoute(e.second, len);
 					continue;
 				}
 			}
@@ -109,7 +118,7 @@ void PCTrie::buildTrie() {
 			Leaf* new_leaf = new Leaf(new_int, e.first);
 
 			// Push route to new leaf
-			new_leaf->push_route(e.second, len);
+			new_leaf->pushRoute(e.second, len);
 
 			// Which child is left, which is right
 			if(extractBit(e.first, pos)){
@@ -123,8 +132,17 @@ void PCTrie::buildTrie() {
 			}
 
 			// Do the bases of the Internal node and the possible left leaf match?
-			if((new_int->left->type == LEAF) && (new_int->base == new_int->left->base)){
+			if((new_int->left->type == LEAF) &&
+					(new_int->base == (new_int->left->base & PREFIX_MASK(pos)))){
 				new_int->leaf = static_cast<Leaf*>(new_int->left);
+			}
+
+			// Do we need to pass the leaf node of the left child up?
+			if((new_int->left->type == INTERNAL) &&
+				static_cast<Internal*>(new_int->left)->leaf->hasMoreGeneralRoute(len)){
+				Internal* cur_int = static_cast<Internal*>(new_int->left);
+				new_int->leaf = cur_int->leaf;
+				cur_int->leaf = NULL;
 			}
 
 			// Are we "above" the root
@@ -161,7 +179,7 @@ void PCTrie::buildTrie() {
 			}
 
 			// Add snapshot for qtree history
-			add_qtree_snapshot();
+			addQtreeSnapshot();
 		}
 	}
 };
@@ -220,7 +238,7 @@ uint32_t PCTrie::route(uint32_t addr){
 	return 0xffffffff;
 };
 
-string PCTrie::get_qtree_snapshot(){
+string PCTrie::getQtreeSnapshot(){
 	string output = "";
 	output += "\
 %\n\
@@ -257,7 +275,7 @@ string PCTrie::get_qtree_snapshot(){
 		// \draw[dashed,->] (root)..controls +(west:1.5) and +(north west:1.2) .. (A);
 			references += "\\draw[semithick,dashed,->] ("
 				+ to_string((uint64_t) node)
-				+ ")..controls +(west:1.5) and +(north west:1.5) .. ("
+				+ ")..controls +(west:1.5) and +(north west:1.8) .. ("
 				+ to_string((uint64_t) node->leaf)
 				+ ");\n";
 		}
@@ -299,11 +317,11 @@ string PCTrie::get_qtree_snapshot(){
 	return output;
 };
 
-void PCTrie::add_qtree_snapshot(){
-	qtree_prev += get_qtree_snapshot();
+void PCTrie::addQtreeSnapshot(){
+	qtree_prev += getQtreeSnapshot();
 };
 
-string PCTrie::finalize_qtree(string tree){
+string PCTrie::finalizeQtree(string tree){
 	string output = "\
 \\documentclass[preview,multi={tikzpicture},border={5pt 5pt 5pt 5pt}]{standalone} \n \
 %\n\
@@ -322,11 +340,11 @@ string PCTrie::finalize_qtree(string tree){
 	return output;
 };
 
-string PCTrie::get_qtree(){
-	return finalize_qtree(get_qtree_snapshot());
+string PCTrie::getQtree(){
+	return finalizeQtree(getQtreeSnapshot());
 };
 
-string PCTrie::get_qtree_history(){
-	return finalize_qtree(qtree_prev);
+string PCTrie::getQtreeHistory(){
+	return finalizeQtree(qtree_prev);
 }
 

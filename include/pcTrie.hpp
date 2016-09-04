@@ -55,7 +55,8 @@ private:
 		std::vector<struct leaf_entry> entries;
 
 		Leaf(Internal* parent, uint32_t base);
-		void push_route(uint32_t next_hop, uint32_t prefix_length);
+		void pushRoute(uint32_t next_hop, uint32_t prefix_length);
+		bool hasMoreGeneralRoute(uint32_t prefix_length);
 	};
 
 	Node* root;
@@ -65,15 +66,15 @@ private:
 	void buildTrie();
 
 	std::string qtree_prev;
-	void add_qtree_snapshot();
-	std::string get_qtree_snapshot();
-	std::string finalize_qtree(std::string tree);
+	void addQtreeSnapshot();
+	std::string getQtreeSnapshot();
+	std::string finalizeQtree(std::string tree);
 
 public:
 	PCTrie(Table& table);
 
-	std::string get_qtree();
-	std::string get_qtree_history();
+	std::string getQtree();
+	std::string getQtreeHistory();
 
 	uint32_t route(uint32_t);
 	//void routeBatch(uint32_t* in, uint32_t* out, int count);
