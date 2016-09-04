@@ -215,31 +215,6 @@ uint32_t PCTrie::route(uint32_t addr){
 	}
 
 	return 0xffffffff;
-
-#if 0 // Still from BasicTrie
-	// Bootstrap first iteration
-	Internal* cur = root;
-	int pos = 0;
-	uint32_t bit = extractBit(addr, pos);
-	Internal* next = (bit) ? cur->right : cur->left;
-
-	// Traverse downwards
-	while(next){
-		cur = next;
-		bit = extractBit(addr, ++pos);
-		next = (bit) ? cur->right : cur->left;
-	}
-
-	// Traverse upwards, until a matching prefix is found
-	while(cur){
-		if(cur->leaf && ((cur->leaf->mask & addr) == cur->leaf->base)){
-			return cur->leaf->next_hop;
-		}
-		cur = cur->parent;
-	}
-
-	return 0xffffffff;
-#endif
 };
 
 string PCTrie::get_qtree(){
@@ -255,53 +230,69 @@ string PCTrie::get_qtree(){
 	\\begin{tikzpicture}\n\
 		\\tikzset{every tree node/.style={align=center,anchor=north}}\n";
 
-		// example: \Tree [ [ .0 0\\A [ .1\\B 0 [ .1 0 1\\F ] ] ] [ .1 0\\C [ .1\\D 0\\E 1 ]]]
-		output += "\\Tree ";
+	// example: \Tree [ [ .0 0\\A [ .1\\B 0 [ .1 0 1\\F ] ] ] [ .1 0\\C [ .1\\D 0\\E 1 ]]]
+	output += "\\Tree ";
+	string references = "";
 
-		function<void (PCTrie::Internal*)> recursive_helper = [&output,&recursive_helper](Internal* node){
-			output += " [ ";
+	function<void (PCTrie::Internal*)> recursive_helper =
+		[&output,&references,&recursive_helper](Internal* node){
 
-			// Helper function for later
-			auto leaf_printer = [&output](Leaf* leaf){
-				output += "\\node[draw]{";
-				output += ip_to_str(leaf->base);
-				for(auto& e : leaf->entries){
-					output += "\\\\";
-					output += ip_to_str(e.next_hop) + ":" + to_string(e.prefix_length);
-				}
-				output += "}; ";
-			};
+		output += " [ ";
 
-			// node itself
-			output += "." + ip_to_str(node->base) + "-" + to_string(node->splitPos) + " ";
-
-			// left child
-			if(node->left->type == INTERNAL){
-				recursive_helper(static_cast<Internal*>(node->left));
-			} else {
-				leaf_printer(static_cast<Leaf*>(node->left));
+		// Helper function for later
+		auto leaf_printer = [&output](Leaf* leaf){
+			output += "\\node[draw]("
+				+ to_string((uint64_t) leaf)
+				+ "){" + ip_to_str(leaf->base);
+			for(auto& e : leaf->entries){
+				output += "\\\\";
+				output += ip_to_str(e.next_hop) + ":" + to_string(e.prefix_length);
 			}
-
-			// Insert line break - otherwise pdflatex breaks
-			output += "\n";
-
-			// right child
-			if(node->right->type == INTERNAL){
-				recursive_helper(static_cast<Internal*>(node->right));
-			} else {
-				leaf_printer(static_cast<Leaf*>(node->right));
-			}
-
-			output += " ] ";
+			output += "}; ";
 		};
 
-		// Let's roll
-		if(root->type == INTERNAL){
-			recursive_helper(static_cast<Internal*>(root));
-		} else {
-			cerr << "PCTrie::get_qtree() root is just a leaf..." << endl;
-			__builtin_trap();
+		// node itself
+		output += ".\\node(" + to_string((uint64_t) node) + "){"
+			+ ip_to_str(node->base) + "-" + to_string(node->splitPos) + "}; ";
+
+		if(node->leaf){
+		// \draw[dashed,->] (root)..controls +(west:1.5) and +(north west:1.2) .. (A);
+			references += "\\draw[semithick,dashed,->] ("
+				+ to_string((uint64_t) node)
+				+ ")..controls +(west:1.5) and +(north west:1.5) .. ("
+				+ to_string((uint64_t) node->leaf)
+				+ ");\n";
 		}
+
+		// left child
+		if(node->left->type == INTERNAL){
+			recursive_helper(static_cast<Internal*>(node->left));
+		} else {
+			leaf_printer(static_cast<Leaf*>(node->left));
+		}
+
+		// Insert line break - otherwise pdflatex breaks
+		output += "\n";
+
+		// right child
+		if(node->right->type == INTERNAL){
+			recursive_helper(static_cast<Internal*>(node->right));
+		} else {
+			leaf_printer(static_cast<Leaf*>(node->right));
+		}
+
+		output += " ] ";
+	};
+
+	// Let's roll
+	if(root->type == INTERNAL){
+		recursive_helper(static_cast<Internal*>(root));
+	} else {
+		cerr << "PCTrie::get_qtree() root is just a leaf..." << endl;
+		__builtin_trap();
+	}
+
+	output += references;
 
 	output +="\n\
 	\\end{tikzpicture}\n\
@@ -309,66 +300,4 @@ string PCTrie::get_qtree(){
 \\end{document}\n";
 	return output;
 };
-
-#if 0
-void BasicTrie::routeBatch(uint32_t* in, uint32_t* out, int count){
-	// Mask - which addresses are finished
-	uint64_t cur_mask = 0;
-	uint64_t finished_mask = (((uint64_t) 1) << count) -1;
-
-	// Mask - which traversals go upwards again
-	uint64_t dir_mask = 0;
-
-	// Bootstrap first iteration
-	Internal* cur[64];
-	int pos[64] = {0};
-	uint32_t bit[64] = {0};
-	Internal* next[64];
-
-	for(int i=0; i<64; i++){
-		cur[i] = root;
-	}
-
-	for(int i=0; i<count; i++){
-		bit[i] = extractBit(in[i], pos[i]);
-		next[i] = (bit[i]) ? cur[i]->right : cur[i]->left;
-	}
-
-	// Set all results to not-found
-	for(int i=0; i<count; i++){
-		out[i] = 0xffffffff;
-	}
-
-	// Until all addresses are flagged finished
-	while(cur_mask != finished_mask){
-		// Iterate over the complete batch
-		for(int i=0; i<count; i++){
-			// Filter/Mask for not finished addresses
-			if(!(cur_mask & (((uint64_t) 1) << i))){
-				// Decide if traversal is downwards or upwards
-				if(!(dir_mask & (((uint64_t) 1) << i))){
-					// Traverse downwards
-					cur[i] = next[i];
-					bit[i] = extractBit(in[i], ++pos[i]);
-					next[i] = (bit[i]) ? cur[i]->right : cur[i]->left;
-					if(!next[i]){
-						dir_mask |= ((uint64_t) 1) << i;
-					}
-					__builtin_prefetch(next[i]);
-				} else {
-					// Traverse upwards, until a matching prefix is found
-					if(cur[i]->leaf &&
-							((cur[i]->leaf->mask & in[i])
-							 == cur[i]->leaf->base)){
-						out[i] = cur[i]->leaf->next_hop;
-						cur_mask |= ((uint64_t) 1) << i;
-					}
-					cur[i] = cur[i]->parent;
-					__builtin_prefetch(cur[i]);
-				}
-			}
-		}
-	}
-}
-#endif
 
