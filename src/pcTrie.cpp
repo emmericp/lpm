@@ -191,6 +191,55 @@ PCTrie::PCTrie(Table& table) : root(NULL), table(table) {
 	buildTrie();
 };
 
+unsigned int PCTrie::getSize(){
+
+	unsigned int num_int = 0;
+	unsigned int num_leaf = 0;
+	unsigned int num_entries = 0;
+
+	function<void(Internal*)> summer =
+		[&num_int, &num_leaf, &num_entries, &summer](Internal* cur) {
+
+		num_int++;
+
+		if(cur->left->type == INTERNAL){
+			summer(static_cast<Internal*>(cur->left));
+		} else {
+			num_leaf++;
+			num_entries += static_cast<Leaf*>(cur->left)->entries.max_size();
+		}
+
+		if(cur->right->type == INTERNAL){
+			summer(static_cast<Internal*>(cur->right));
+		} else {
+			num_leaf++;
+			num_entries += static_cast<Leaf*>(cur->right)->entries.max_size();
+		}
+	};
+
+	if(root && root->type == INTERNAL){
+		summer(static_cast<Internal*>(root));
+	}
+
+	unsigned int size_int = sizeof(Internal);
+	unsigned int size_leaf = sizeof(Leaf);
+	unsigned int size_leaf_entry = sizeof(Leaf::leaf_entry);
+
+#if 0
+	cerr << "Number of internal nodes: " << num_int
+		<< " size each: " << size_int
+		<< " size all: " << (size_int * num_int) / 1024 << " KiB" << endl;
+	cerr << "Number of leaf nodes: " << num_leaf
+		<< " size each: " << size_leaf
+		<< " size all: " << (size_leaf * num_leaf) / 1024 << " KiB" << endl;
+	cerr << "Number of leaf entries: " << num_entries
+		<< " size each: " << size_leaf_entry
+		<< " size all: " << (size_leaf_entry * num_entries) / 1024 << " KiB" << endl;
+#endif
+
+	return size_int * num_int + size_leaf * num_leaf + size_leaf_entry  * num_entries;
+};
+
 uint32_t PCTrie::route(uint32_t addr){
 	Node* cur = root;
 

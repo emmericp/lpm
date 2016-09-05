@@ -89,6 +89,8 @@ public:
 	std::string getQtreeHistory();
 #endif
 
+	unsigned int getSize();
+
 	uint32_t route(uint32_t);
 	//void routeBatch(uint32_t* in, uint32_t* out, int count);
 };
