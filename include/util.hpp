@@ -8,6 +8,11 @@
 
 #define PREFIX_MASK(len) ((uint32_t) (~((((uint64_t) 1) << (32-len)) -1)))
 
+#ifndef likely
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
+
 inline std::string ip_to_str(uint32_t ip){
 	struct in_addr in_addr;
 	in_addr.s_addr = htonl(ip);

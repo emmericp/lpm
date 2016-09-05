@@ -200,7 +200,7 @@ uint32_t PCTrie::route(uint32_t addr){
 	}
 
 	// Traverse down
-	while(cur->type == INTERNAL){
+	while(likely(cur->type == INTERNAL)){
 		Internal* cur_int = static_cast<Internal*>(cur);
 		if(extractBit(addr, cur_int->splitPos)){
 			cur = cur_int->right;
@@ -222,7 +222,7 @@ uint32_t PCTrie::route(uint32_t addr){
 	cur = cur->parent;
 
 	// Backtrack upwards
-	while(cur){
+	while(likely(cur)){
 		Internal* cur_int = static_cast<Internal*>(cur);
 		if(cur_int->leaf){
 			cur_leaf = static_cast<Leaf*>(cur_int->leaf);

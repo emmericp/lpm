@@ -83,7 +83,7 @@ void run_challenge(Table& table, string challenge_filename){
 
 	char* mmap_base =  (char*) mmap(
 			NULL,
-		       	header.num_entries * sizeof(challenge_entry) + sizeof(challenge_header),
+			header.num_entries * sizeof(challenge_entry) + sizeof(challenge_header),
 			PROT_READ,
 			MAP_PRIVATE,
 			fd,
@@ -98,6 +98,7 @@ void run_challenge(Table& table, string challenge_filename){
 
 	int failed = 0;
 	int success = 0;
+
 	//DXR lpm(table);
 	//Naive lpm(table);
 	//BasicTrie lpm(table);
@@ -113,7 +114,7 @@ void run_challenge(Table& table, string challenge_filename){
 	// No batching
 	for(unsigned int i=0; i<header.num_entries; i++){
 		uint32_t res = lpm.route(entries[i].addr);
-		if(res != entries[i].next_hop){
+		if(unlikely(res != entries[i].next_hop)){
 			cout << "Failed IP: " << ip_to_str(entries[i].addr) << endl;
 			cout << "Expected : " << ip_to_str(entries[i].next_hop) << endl;
 			cout << "Got      : " << ip_to_str(res) << endl << endl;
