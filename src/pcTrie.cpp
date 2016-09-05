@@ -2,41 +2,6 @@
 
 using namespace std;
 
-PCTrie::Node::Node(
-		Internal* parent,
-		enum node_type type,
-		uint32_t base) :
-	parent(parent), type(type), base(base) {};
-
-PCTrie::Internal::Internal(
-		Internal* parent,
-		uint32_t base,
-		Internal* left,
-       	Internal* right,
-       	Leaf* leaf,
-       	int splitPos) :
-	Node(parent, INTERNAL, base), left(left), right(right), leaf(leaf), splitPos(splitPos) {};
-
-PCTrie::Leaf::Leaf(Internal* parent, uint32_t base) :
-	Node(parent, LEAF, base) {};
-
-void PCTrie::Leaf::pushRoute(uint32_t next_hop, uint32_t prefix_length) {
-	struct leaf_entry entry;
-	entry.next_hop = next_hop;
-	entry.prefix_length = prefix_length;
-	entries.push_back(entry);
-	sort(entries.begin(), entries.end());
-};
-
-bool PCTrie::Leaf::hasMoreGeneralRoute(uint32_t prefix_length) {
-	for(auto& e : entries){
-		if(e.prefix_length < prefix_length){
-			return true;
-		}
-	}
-	return false;
-};
-
 void PCTrie::buildTrie() {
 	// Build trie
 	vector<map<uint32_t,uint32_t>> tbl = table.get_sorted_entries();
@@ -191,6 +156,7 @@ PCTrie::PCTrie(Table& table) : root(NULL), table(table) {
 	buildTrie();
 };
 
+#if 0
 unsigned int PCTrie::getSize(){
 
 	unsigned int num_int = 0;
@@ -239,6 +205,7 @@ unsigned int PCTrie::getSize(){
 
 	return size_int * num_int + size_leaf * num_leaf + size_leaf_entry  * num_entries;
 };
+#endif
 
 uint32_t PCTrie::route(uint32_t addr){
 	Node* cur = root;

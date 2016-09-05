@@ -13,6 +13,35 @@
 class PCTrie {
 private:
 
+	struct Internal {
+		uint32_t base;
+		uint32_t parent;
+		uint16_t splitPos;
+		uint16_t childTypes; // If most sig bit set: only one child (root)
+		uint32_t leaf;
+		uint32_t left;
+		uint32_t right;
+	} __attribute__ ((aligned (8)));
+
+	struct Leaf {
+		uint32_t base;
+		uint32_t parent;
+		uint32_t nextHops;
+		uint32_t number;
+	} __attribute__ ((aligned (8)));
+
+	struct NextHop {
+		uint32_t nextHop;
+		uint32_t prefixLength;
+	} __attribute__ ((aligned (8)));
+
+	struct Internal* internals;
+	struct Leaf* leafs;
+	struct NextHop* nextHops;
+
+	uint32_t root;
+
+/*
 	class Internal;
 	class Leaf;
 	class Node;
@@ -69,7 +98,7 @@ private:
 	};
 
 	Node* root;
-
+*/
 	Table& table;
 
 	void buildTrie();
@@ -92,7 +121,6 @@ public:
 	unsigned int getSize();
 
 	uint32_t route(uint32_t);
-	//void routeBatch(uint32_t* in, uint32_t* out, int count);
 };
 
 #endif /* PCTRIE_HPP */
