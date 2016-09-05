@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 
 #define PREFIX_MASK(len) ((uint32_t) (~((((uint64_t) 1) << (32-len)) -1)))
+#define PREFIX_MASK_64(len) ((uint64_t) (~((((uint64_t) 1) << (64-len)) -1)))
 
 #ifndef likely
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -31,6 +32,17 @@ inline int mostSigOne(uint32_t num){
 		uint32_t test = 1 << i;
 		if(num & test){
 			return 31-i;
+		}
+	}
+
+	return -1;
+}
+
+inline int mostSigOne(uint64_t num){
+	for(int i=63; i>=0; i--){
+		uint64_t test = 1 << i;
+		if(num & test){
+			return 63-i;
 		}
 	}
 
