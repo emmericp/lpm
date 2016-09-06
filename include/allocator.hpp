@@ -28,7 +28,7 @@ public:
 			std::abort();
 		}
 
-		maps = malloc((size/64) * sizeof(uint64_t));
+		maps = static_cast<uint64_t*>(malloc((size/64) * sizeof(uint64_t)));
 		if(maps == NULL){
 			std::cerr << "Allocator::Allocator maps is NULL" << std::endl;
 			std::abort();
@@ -36,8 +36,12 @@ public:
 	};
 
 	~Allocator() {
-		munmap(array);
+		munmap(array, size);
 		free(maps);
+	};
+
+	T* getPointer() {
+		return array;
 	};
 
 	size_t insert(T& obj) {

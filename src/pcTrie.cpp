@@ -2,64 +2,122 @@
 
 using namespace std;
 
+#define TRIE_NULL 0xffffffff
+
+/*
+void PCTrie::Leaf::pushRoute(
+		uint32_t pos,
+		struct NextHop e,
+		struct PCTrie::Leaf* leafs,
+		struct NextHop* nextHops,
+		Allocator<struct NextHop>& nextHops_alloc){ */
+void PCTrie::Leaf::pushRoute(
+		struct NextHop e,
+		struct NextHop* nextHops,
+		Allocator<struct NextHop>& nextHops_alloc){
+	// Copy nextHops, erase, sort, insert
+	struct NextHop* nextHop =
+		(struct NextHop*) malloc((this->number +1) * sizeof(struct NextHop));
+	memcpy(nextHop, &nextHops[this->nextHops], this->number);
+	nextHop[this->number].nextHop = e.nextHop;
+	nextHop[this->number].prefixLength = e.prefixLength;
+	sort(&nextHop[0], &nextHop[this->number]);
+	this->nextHops = nextHops_alloc.insert(nextHop, this->number+1);
+	this->number++;
+	free(nextHop);
+};
+
 void PCTrie::buildTrie() {
 	// Build trie
 	vector<map<uint32_t,uint32_t>> tbl = table.get_sorted_entries();
-	for(int len=0; len<=32; len++){
+	for(unsigned int len=0; len<=32; len++){
 		for(auto& e : tbl[len]){
 			// Is the trie empty?
-			if(root == NULL){
-				// Place leaf as root
-				//root = new Leaf(NULL, len, e.first, e.second);
-				root = new Leaf(NULL, e.first);
+			if(buildState == EMPTY){
+				// Create structs and insert into arrays
+				/*
+				struct Internal new_int;
+				new_int.base = 0;
+				new_int.parent = TRIE_NULL;
+				new_int.splitPos = 0;
+				new_int.childTypes = 0;
+				new_int.leaf = TRIE_NULL;
+				new_int.left = TRIE_NULL;
+				new_int.right = TRIE_NULL;
+				root = internals_alloc.insert(new_int);
+				*/
 
-				// Push route into leaf
-				static_cast<Leaf*>(root)->pushRoute(e.second, len);
+				struct Leaf new_leaf;
+				new_leaf.base = e.first;
+				new_leaf.parent = root;
+				new_leaf.nextHops = TRIE_NULL;
+				new_leaf.number = 1;
+				root = leafs_alloc.insert(new_leaf);
+
+				struct NextHop new_nextHop;
+				new_nextHop.nextHop = e.second;
+				new_nextHop.prefixLength = len;
+				uint32_t nextHop = nextHops_alloc.insert(new_nextHop);
+
+				// Set correct positions
+				leafs[root].nextHops = nextHop;
+				/*
+				internals[root].left = leaf;
+				internals[root].leaf = leaf;
+				*/
+
+				buildState = ONE_LEAF;
+				continue;
+			}
+
+			if((buildState == ONE_LEAF) && (leafs[root].base == e.first)){
+				// Just add it to the existing next hop entry
+				struct Leaf* leaf = &leafs[root];
+
+				leaf->pushRoute({.nextHop = e.second, .prefixLength = len},
+						nextHops, nextHops_alloc);
+
 				continue;
 			}
 
 			// Traverse to the first prefix conflict, or until a leaf is found
-			Node* cur = root;
-			while(cur->type == INTERNAL){
-				Internal* cur_int = static_cast<Internal*>(cur);
-				uint32_t mask = PREFIX_MASK(cur_int->splitPos);
+			Node cur(root, buildState-1, internals, leafs);
+			while(cur.is_internal){
+				uint32_t mask = PREFIX_MASK(internals[cur.pos].splitPos);
 
 				// Does the prefix still match?
-				if(cur_int->base ^ (e.first & mask)){
+				if(cur.base() ^ (e.first & mask)){
 					// We found a mismatch
 					break;
 				} else {
 					// Traverse further down
-					if(extractBit(e.first, cur_int->splitPos)){
-						cur = cur_int->right;
+					if(extractBit(e.first, internals[cur.pos].splitPos)){
+						cur.goRight();
 					} else {
-						cur = cur_int->left;
+						cur.goLeft();
 					}
 				}
 			}
 
-			if(cur->type == LEAF){
+			if(!cur.is_internal){
 				// Check if the base matches
-				if(cur->base == e.first){
+				if(cur.base() == e.first){
 					//Push route to leaf
-					static_cast<Leaf*>(cur)->pushRoute(e.second, len);
+					struct Leaf* leaf = &leafs[cur.pos];
+
+					leaf->pushRoute({.nextHop = e.second, .prefixLength = len},
+						nextHops, nextHops_alloc);
+
 					continue;
 				}
 			}
 
 			uint32_t diff; // Significant difference between bases
 
-			// Are we "above" the root
-			if(cur){
-				if(cur->type == INTERNAL){
-					Internal* cur_int = static_cast<Internal*>(cur);
-					diff = cur->base ^ (e.first & PREFIX_MASK(cur_int->splitPos));
-				} else {
-					diff = cur->base ^ e.first;
-				}
+			if(cur.is_internal){
+				diff = cur.base() ^ (e.first & PREFIX_MASK(internals[cur.pos].splitPos));
 			} else {
-				// root is a leaf, the new addr is a second one
-				diff = root->base ^ e.first;
+				diff = cur.base() ^ e.first;
 			}
 
 			// Where is the new split position?
@@ -72,74 +130,87 @@ void PCTrie::buildTrie() {
 			}
 			uint32_t mask = PREFIX_MASK(pos);
 
+			// Allocate new data structures
 			uint32_t new_base = e.first & mask; // This prefix is still shared
-			Internal* new_int;
+			struct Internal new_int;
+			new_int.base = new_base;
+			new_int.splitPos = pos;
+			new_int.parent = cur.parent();
+			new_int.childTypes = 0;
+			new_int.leaf = TRIE_NULL;
+			new_int.left = TRIE_NULL;
+			new_int.right = TRIE_NULL;
+			uint32_t new_int_pos = internals_alloc.insert(new_int);
+			Internal* new_int_p = &internals[new_int_pos];
 
-			// Are we "above" the root
-			if(cur){
-				new_int = new Internal(cur->parent, new_base, NULL, NULL, NULL, pos);
-			} else {
-				new_int = new Internal(NULL, new_base, NULL, NULL, NULL, pos);
-			}
-			Leaf* new_leaf = new Leaf(new_int, e.first);
+			//Leaf* new_leaf = new Leaf(new_int, e.first);
+			struct Leaf new_leaf;
+			new_leaf.parent = new_int_pos;
+			new_leaf.base = e.first;
+			new_leaf.number = 1;
+			uint32_t new_leaf_pos = leafs_alloc.insert(new_leaf);
 
-			// Push route to new leaf
-			new_leaf->pushRoute(e.second, len);
+			struct NextHop nextHop;
+			nextHop.nextHop = e.second;
+			nextHop.prefixLength = len;
+			uint32_t nextHop_pos = nextHops_alloc.insert(nextHop);
+
+			leafs[new_leaf_pos].nextHops = nextHop_pos;
 
 			// Which child is left, which is right
 			if(extractBit(e.first, pos)){
 				// New leaf is right
-				new_int->right = new_leaf;
-				new_int->left = (cur) ? cur : root;
+				new_int_p->right = new_leaf_pos;
+				new_int_p->left = cur.pos;
+				if(cur.is_internal){
+					SET_LEFT_INTERNAL(new_int_p);
+				}
 			} else {
 				// New leaf is left
-				new_int->left = new_leaf;
-				new_int->right = (cur) ? cur : root;
+				new_int_p->left = new_leaf_pos;
+				new_int_p->right = cur.pos;
+				if(cur.is_internal){
+					SET_LEFT_INTERNAL(new_int_p);
+				}
 			}
 
 			// Do the bases of the Internal node and the possible left leaf match?
-			if((new_int->left->type == LEAF) &&
-					(new_int->base == (new_int->left->base & PREFIX_MASK(pos)))){
-				new_int->leaf = static_cast<Leaf*>(new_int->left);
+			if(!IS_LEFT_INTERNAL(new_int_p) &&
+					(new_int_p->base == (internals[new_int_p->left].base & PREFIX_MASK(pos)))){
+				new_int_p->leaf = new_int_p->left;
 			}
 
 			// Do we need to pass the leaf node of the left child up?
-			if((new_int->left->type == INTERNAL) && static_cast<Internal*>(new_int->left)->leaf &&
-				static_cast<Internal*>(new_int->left)->leaf->hasMoreGeneralRoute(len)){
-				Internal* cur_int = static_cast<Internal*>(new_int->left);
-				new_int->leaf = cur_int->leaf;
-				cur_int->leaf = NULL;
-			}
-
-			// Are we "above" the root
-			if(cur){
-				cur->parent = new_int;
-			} else {
-				root = new_int;
+			if(IS_LEFT_INTERNAL(new_int_p) && internals[new_int_p->left].leaf != TRIE_NULL &&
+					leafs[internals[new_int_p->left].leaf].hasMoreGeneralRoute(len)){
+				new_int_p->leaf = internals[new_int_p->left].leaf;
+				internals[new_int_p->left].leaf = TRIE_NULL;
 			}
 
 			// Are we dealing with the root node?
-			if(new_int->parent){
-				Internal* parent = new_int->parent;
-				if(parent->left == cur){
-					parent->left = new_int;
+			if(new_int_p->parent != TRIE_NULL){
+				struct Internal* parent = &internals[new_int_p->parent];
+				if(parent->left == cur.pos){
+					parent->left = new_int_pos;
 				} else {
-					parent->right = new_int;
+					parent->right = new_int_pos;
 				}
 			} else {
-				root = new_int;
+				root = new_int_pos;
+				buildState = NORMAL; // if it wasn't already
 			}
 
 			// Sanity check
-			if(new_int->left == NULL){
+			if(new_int_p->left == TRIE_NULL){
 				cerr << "PCTrie::buildTrie() new_int->left is NULL" << endl;
 				abort();
 			}
-			if(new_int->right == NULL){
+			if(new_int_p->right == TRIE_NULL){
 				cerr << "PCTrie::buildTrie() new_int->right is NULL" << endl;
 				abort();
 			}
-			if(new_int->parent && (new_int->splitPos <= new_int->parent->splitPos)){
+			if(new_int_p->parent &&
+					(new_int_p->splitPos <= internals[new_int_p->parent].splitPos)){
 				cerr << "PCTrie::buildTrie() parent splitPos is >= new splitPos" << endl;
 				abort();
 			}
@@ -152,7 +223,20 @@ void PCTrie::buildTrie() {
 	}
 };
 
-PCTrie::PCTrie(Table& table) : root(NULL), table(table) {
+#define S_32MiB (32 * (1024*1024))
+
+PCTrie::PCTrie(Table& table) :
+	internals_alloc(S_32MiB),
+	leafs_alloc(S_32MiB),
+	nextHops_alloc(S_32MiB),
+	root(0xffffffff),
+	table(table),
+	buildState(EMPTY) {
+
+	internals = internals_alloc.getPointer();
+	leafs = leafs_alloc.getPointer();
+	nextHops = nextHops_alloc.getPointer();
+
 	buildTrie();
 };
 
@@ -207,6 +291,7 @@ unsigned int PCTrie::getSize(){
 };
 #endif
 
+#if 0
 uint32_t PCTrie::route(uint32_t addr){
 	Node* cur = root;
 
@@ -256,6 +341,7 @@ uint32_t PCTrie::route(uint32_t addr){
 
 	return 0xffffffff;
 };
+#endif
 
 #if PCTRIE_QTREE == 1
 

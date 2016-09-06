@@ -7,101 +7,106 @@
 #include <cstdlib>
 
 #include "table.hpp"
+#include "allocator.hpp"
 
 #define PCTRIE_QTREE 0
 
+#define IS_LEFT_INTERNAL(internal) (internal->childTypes & 1)
+#define SET_LEFT_INTERNAL(internal) (internal->childTypes |= 1)
+#define IS_RIGHT_INTERNAL(internal) ((internal->childTypes & 2) >> 1)
+#define SET_RIGHT_INTERNAL(internal) (internal->childTypes |= 2)
+
 class PCTrie {
 private:
+
+	struct Internal;
+	struct Leaf;
+	struct NextHop;
 
 	struct Internal {
 		uint32_t base;
 		uint32_t parent;
 		uint16_t splitPos;
-		uint16_t childTypes; // If most sig bit set: only one child (root)
+		uint16_t childTypes;
 		uint32_t leaf;
 		uint32_t left;
 		uint32_t right;
-	} __attribute__ ((aligned (8)));
+	};
 
 	struct Leaf {
 		uint32_t base;
 		uint32_t parent;
 		uint32_t nextHops;
 		uint32_t number;
-	} __attribute__ ((aligned (8)));
+
+		void pushRoute(
+				struct PCTrie::NextHop e,
+				struct PCTrie::NextHop* nextHops,
+				Allocator<struct NextHop>& nextHops_alloc);
+
+		bool hasMoreGeneralRoute(int len);
+	};
 
 	struct NextHop {
 		uint32_t nextHop;
 		uint32_t prefixLength;
-	} __attribute__ ((aligned (8)));
+
+		bool operator < (const struct NextHop& e) const {
+			return prefixLength > e.prefixLength;
+		}
+	};
+
+	// Useful traversal helper class
+	class Node {
+	public:
+		bool is_internal;
+		uint32_t pos;
+		struct Internal* internals;
+		struct Leaf* leafs;
+
+		Node(uint32_t pos, bool is_internal, struct Internal* internals, struct Leaf* leafs) :
+			is_internal(is_internal), pos(pos), internals(internals), leafs(leafs) {};
+
+		uint32_t base(){
+			return is_internal ? internals[pos].base : leafs[pos].base;
+		};
+		uint32_t parent(){
+			return is_internal ? internals[pos].base : leafs[pos].base;
+		};
+		void goUp(){
+			pos = is_internal ? internals[pos].parent : leafs[pos].parent;
+			is_internal = true;
+		}
+		void goLeft(){
+			if(!IS_LEFT_INTERNAL((&internals[pos])))
+					is_internal = false;
+			pos = internals[pos].left;
+		};
+		void goRight(){
+			if(!IS_RIGHT_INTERNAL((&internals[pos])))
+					is_internal = false;
+			pos = internals[pos].right;
+		};
+	};
 
 	struct Internal* internals;
 	struct Leaf* leafs;
 	struct NextHop* nextHops;
 
+	Allocator<struct Internal> internals_alloc;
+	Allocator<struct Leaf> leafs_alloc;
+	Allocator<struct NextHop> nextHops_alloc;
+
 	uint32_t root;
 
-/*
-	class Internal;
-	class Leaf;
-	class Node;
-
-	enum node_type {
-		INTERNAL,
-		LEAF
-	};
-
-	class Node {
-	public:
-		Internal* parent;
-		enum node_type type;
-		uint32_t base;
-
-		Node(
-			Internal* parent,
-			enum node_type type,
-			uint32_t base);
-	};
-
-	class Internal : public Node {
-	public:
-		Node* left;
-		Node* right;
-		Leaf* leaf;
-		uint8_t splitPos;
-
-		Internal(
-			Internal* parent,
-			uint32_t base,
-			Internal* left,
-	       	Internal* right,
-	       	Leaf* leaf,
-	       	int splitPos);
-	};
-
-	class Leaf : public Node {
-	public:
-		struct leaf_entry {
-			uint32_t next_hop;
-			uint32_t prefix_length;
-
-			bool operator < (const leaf_entry& e) const {
-				return prefix_length > e.prefix_length;
-			}
-		};
-
-		std::vector<struct leaf_entry> entries;
-
-		Leaf(Internal* parent, uint32_t base);
-		void pushRoute(uint32_t next_hop, uint32_t prefix_length);
-		bool hasMoreGeneralRoute(uint32_t prefix_length);
-	};
-
-	Node* root;
-*/
 	Table& table;
 
 	void buildTrie();
+	enum buildState {
+		EMPTY = 0,
+		ONE_LEAF = 1,
+		NORMAL = 2
+	} buildState;
 
 #if PCTRIE_QTREE == 1
 	std::stringstream qtree_prev;
