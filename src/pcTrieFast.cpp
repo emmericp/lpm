@@ -225,7 +225,11 @@ void PCTrieFast::buildTrie() {
 			if(new_int_p->parent != TRIE_NULL &&
 					(new_int_p->splitPos <= internals[new_int_p->parent].splitPos)){
 				cerr << "PCTrieFast::buildTrie() parent splitPos is >= new splitPos" << endl;
-				//abort();
+				abort();
+			}
+			if(new_int_p->parent == TRIE_NULL && new_int_pos != root){
+				cerr << "PCTrieFast::buildTrie() parent is NULL, but new node is not root" << endl;
+				abort();
 			}
 
 			// Add snapshot for qtree history
@@ -304,57 +308,55 @@ unsigned int PCTrieFast::getSize(){
 };
 #endif
 
-#if 0
 uint32_t PCTrieFast::route(uint32_t addr){
-	Node* cur = root;
-
-	// Is the trie populated at all?
-	if(!root){
+	if(unlikely(buildState != NORMAL)){
 		return 0xffffffff;
 	}
 
+	Node cur(root, 1, internals, leafs);
+
 	// Traverse down
-	while(likely(cur->type == INTERNAL)){
-		Internal* cur_int = static_cast<Internal*>(cur);
-		if(extractBit(addr, cur_int->splitPos)){
-			cur = cur_int->right;
+	while(cur.is_internal){
+		if(extractBit(addr, internals[cur.pos].splitPos)){
+			cur.goRight();
 		} else {
-			cur = cur_int->left;
+			cur.goLeft();
 		}
 	}
 
 	// cur is a leaf at this position
-	Leaf* cur_leaf = static_cast<Leaf*>(cur);
+	struct Leaf* cur_leaf = &leafs[cur.pos];
 
 	// Check for a match, XXX same as below (lambda function maybe?)
-	for(auto& entry : cur_leaf->entries){
-		uint32_t mask = PREFIX_MASK(entry.prefix_length);
+	for(unsigned int i=0; i<cur_leaf->number; i++){
+		struct NextHop* entry = &nextHops[cur_leaf->nextHops+i];
+		uint32_t mask = PREFIX_MASK(entry->prefixLength);
 		if((addr & mask) == cur_leaf->base){
-			return entry.next_hop;
+			return entry->nextHop;
 		}
 	}
-	cur = cur->parent;
+	cur.goUp();
 
 	// Backtrack upwards
-	while(likely(cur)){
-		Internal* cur_int = static_cast<Internal*>(cur);
-		if(cur_int->leaf){
-			cur_leaf = static_cast<Leaf*>(cur_int->leaf);
+	while(cur.pos != TRIE_NULL){
+		struct Internal* cur_int = &internals[cur.pos];
+		if(cur_int->leaf != TRIE_NULL){
+			cur_leaf = &leafs[cur_int->leaf];
 
 			// Check for a match, XXX same as above
-			for(auto& entry : cur_leaf->entries){
-				uint32_t mask = PREFIX_MASK(entry.prefix_length);
+			for(unsigned int i=0; i<cur_leaf->number; i++){
+				struct NextHop* entry = &nextHops[cur_leaf->nextHops+i];
+				uint32_t mask = PREFIX_MASK(entry->prefixLength);
 				if((addr & mask) == cur_leaf->base){
-					return entry.next_hop;
+					return entry->nextHop;
 				}
 			}
 		}
-		cur = cur->parent;
+		cur.goUp();
 	}
 
 	return 0xffffffff;
 };
-#endif
 
 #if PCTRIEFAST_QTREE == 1
 
