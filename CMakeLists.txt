@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-SET(CMAKE_CXX_FLAGS "-Wall -Wextra -Og -g -std=c++11 -march=native")
+SET(CMAKE_CXX_FLAGS "-Wall -Wextra -O0 -g -std=c++11 -march=native")
 
 INCLUDE_DIRECTORIES(
 	${CMAKE_CURRENT_SOURCE_DIR}/include
