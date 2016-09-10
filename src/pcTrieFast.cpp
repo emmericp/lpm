@@ -181,13 +181,13 @@ void PCTrieFast::buildTrie() {
 				new_int_p->left = new_leaf_pos;
 				new_int_p->right = cur.pos;
 				if(cur.is_internal){
-					SET_LEFT_INTERNAL(new_int_p);
+					SET_RIGHT_INTERNAL(new_int_p);
 				}
 			}
 
 			// Do the bases of the Internal node and the possible left leaf match?
 			if(!IS_LEFT_INTERNAL(new_int_p) &&
-					(new_int_p->base == (internals[new_int_p->left].base & PREFIX_MASK(pos)))){
+					(new_int_p->base == (leafs[new_int_p->left].base & PREFIX_MASK(pos)))){
 				new_int_p->leaf = new_int_p->left;
 			}
 
@@ -199,13 +199,14 @@ void PCTrieFast::buildTrie() {
 			}
 
 			// Are we dealing with the root node?
-			// TODO: Something is wrong here
 			if(new_int_p->parent != TRIE_NULL){
 				struct Internal* parent = &internals[new_int_p->parent];
 				if(parent->left == cur.pos){
 					parent->left = new_int_pos;
+					SET_LEFT_INTERNAL(parent);
 				} else {
 					parent->right = new_int_pos;
+					SET_RIGHT_INTERNAL(parent);
 				}
 			} else {
 				root = new_int_pos;
