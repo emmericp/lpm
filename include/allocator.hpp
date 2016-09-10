@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "util.hpp"
 
@@ -22,15 +23,17 @@ public:
 	Allocator(size_t size_wish) {
 		size = size_wish | 0x3f;
 		array = static_cast<T*>(
-				mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0));
-		if(array == NULL){
-			std::cerr << "Allocator::Allocator array is NULL" << std::endl;
+				mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+		if(array == MAP_FAILED){
+			std::cerr << "Allocator::Allocator map failed" << std::endl;
+			std::cerr << "errno: " << strerror(errno) << std::endl;
 			std::abort();
 		}
 
 		maps = static_cast<uint64_t*>(malloc((size/64) * sizeof(uint64_t)));
-		if(maps == NULL){
-			std::cerr << "Allocator::Allocator maps is NULL" << std::endl;
+		if(maps == MAP_FAILED){
+			std::cerr << "Allocator::Allocator map failed" << std::endl;
+			std::cerr << "errno: " << strerror(errno) << std::endl;
 			std::abort();
 		}
 	};

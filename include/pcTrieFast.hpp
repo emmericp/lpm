@@ -9,7 +9,7 @@
 #include "table.hpp"
 #include "allocator.hpp"
 
-#define PCTRIE_QTREE 0
+#define PCTRIEFAST_QTREE 1
 
 #define IS_LEFT_INTERNAL(internal) (internal->childTypes & 1)
 #define SET_LEFT_INTERNAL(internal) (internal->childTypes |= 1)
@@ -44,7 +44,9 @@ private:
 				struct PCTrieFast::NextHop* nextHops,
 				Allocator<struct NextHop>& nextHops_alloc);
 
-		bool hasMoreGeneralRoute(int len);
+		bool hasMoreGeneralRoute(
+				struct PCTrieFast::NextHop* nextHops,
+				unsigned int len);
 	};
 
 	struct NextHop {
@@ -71,7 +73,7 @@ private:
 			return is_internal ? internals[pos].base : leafs[pos].base;
 		};
 		uint32_t parent(){
-			return is_internal ? internals[pos].base : leafs[pos].base;
+			return is_internal ? internals[pos].parent : leafs[pos].parent;
 		};
 		void goUp(){
 			pos = is_internal ? internals[pos].parent : leafs[pos].parent;
@@ -108,7 +110,7 @@ private:
 		NORMAL = 2
 	} buildState;
 
-#if PCTRIE_QTREE == 1
+#if PCTRIEFAST_QTREE == 1
 	std::stringstream qtree_prev;
 	void addQtreeSnapshot();
 	std::string getQtreeSnapshot();
@@ -118,7 +120,7 @@ private:
 public:
 	PCTrieFast(Table& table);
 
-#if PCTRIE_QTREE == 1
+#if PCTRIEFAST_QTREE == 1
 	std::string getQtree();
 	std::string getQtreeHistory();
 #endif

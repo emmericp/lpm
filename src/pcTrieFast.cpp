@@ -27,6 +27,17 @@ void PCTrieFast::Leaf::pushRoute(
 	free(nextHop);
 };
 
+bool PCTrieFast::Leaf::hasMoreGeneralRoute(
+		struct NextHop* nextHops,
+		unsigned int len) {
+	for(unsigned int i=0; i<number; i++){
+		if(nextHops[this->nextHops+i].prefixLength < len){
+			return true;
+		}
+	}
+	return false;
+};
+
 void PCTrieFast::buildTrie() {
 	// Build trie
 	vector<map<uint32_t,uint32_t>> tbl = table.get_sorted_entries();
@@ -82,7 +93,7 @@ void PCTrieFast::buildTrie() {
 
 			// Traverse to the first prefix conflict, or until a leaf is found
 			Node cur(root, buildState-1, internals, leafs);
-			while(cur.is_internal){
+			while(cur.is_internal){ // Might break earlier
 				uint32_t mask = PREFIX_MASK(internals[cur.pos].splitPos);
 
 				// Does the prefix still match?
@@ -182,12 +193,13 @@ void PCTrieFast::buildTrie() {
 
 			// Do we need to pass the leaf node of the left child up?
 			if(IS_LEFT_INTERNAL(new_int_p) && internals[new_int_p->left].leaf != TRIE_NULL &&
-					leafs[internals[new_int_p->left].leaf].hasMoreGeneralRoute(len)){
+					leafs[internals[new_int_p->left].leaf].hasMoreGeneralRoute(nextHops, len)){
 				new_int_p->leaf = internals[new_int_p->left].leaf;
 				internals[new_int_p->left].leaf = TRIE_NULL;
 			}
 
 			// Are we dealing with the root node?
+			// TODO: Something is wrong here
 			if(new_int_p->parent != TRIE_NULL){
 				struct Internal* parent = &internals[new_int_p->parent];
 				if(parent->left == cur.pos){
@@ -209,14 +221,14 @@ void PCTrieFast::buildTrie() {
 				cerr << "PCTrieFast::buildTrie() new_int->right is NULL" << endl;
 				abort();
 			}
-			if(new_int_p->parent &&
+			if(new_int_p->parent != TRIE_NULL &&
 					(new_int_p->splitPos <= internals[new_int_p->parent].splitPos)){
 				cerr << "PCTrieFast::buildTrie() parent splitPos is >= new splitPos" << endl;
-				abort();
+				//abort();
 			}
 
 			// Add snapshot for qtree history
-#if PCTRIE_QTREE == 1
+#if PCTRIEFAST_QTREE == 1
 			addQtreeSnapshot();
 #endif
 		}
@@ -343,30 +355,29 @@ uint32_t PCTrieFast::route(uint32_t addr){
 };
 #endif
 
-#if PCTRIE_QTREE == 1
+#if PCTRIEFAST_QTREE == 1
 
 string PCTrieFast::getQtreeSnapshot(){
 	stringstream output;
 	output << "\
 %\n\
-	\\hspace{10pt}\n\
-	\\begin{tikzpicture}\n\
-		\\tikzset{every tree node/.style={align=center,anchor=north}}\n";
+	\\begin{tikzpicture}\n";
 
 	// example: \Tree [ [ .0 0\\A [ .1\\B 0 [ .1 0 1\\F ] ] ] [ .1 0\\C [ .1\\D 0\\E 1 ]]]
 	output << "\\Tree ";
 	stringstream references;
 
-	function<void (PCTrieFast::Internal*)> recursive_helper =
-		[&output,&references,&recursive_helper](Internal* node){
+	function<void (struct PCTrieFast::Internal*)> recursive_helper =
+		[&output,&references,&recursive_helper,this](struct Internal* node){
 
 		output << " [ ";
 
 		// Helper function for later
-		auto leaf_printer = [&output](Leaf* leaf){
+		auto leaf_printer = [&output,this](struct Leaf* leaf){
 			output << "\\node[draw](" << leaf << "){" << ip_to_str(leaf->base);
-			for(auto& e : leaf->entries){
-				output << "\\\\" << ip_to_str(e.next_hop) << ":" << e.prefix_length;
+			for(unsigned int i=0; i<leaf->number; i++){
+				struct NextHop* e = &nextHops[leaf->nextHops+i];
+				output << "\\\\" << ip_to_str(e->nextHop) << ":" << e->prefixLength;
 			}
 			output << "};";
 		};
@@ -375,34 +386,35 @@ string PCTrieFast::getQtreeSnapshot(){
 		output << ".\\node(" << node << "){" << ip_to_str(node->base)
 			<< "-" << static_cast<int>(node->splitPos) << "};";
 
-		if(node->leaf){
+		if(node->leaf != TRIE_NULL){
 			references << "\\draw[semithick,dashed,->] (" << node
-				<< ") .. controls +(west:1.8) and +(north west:1.8) .. (" << node->leaf << ");\n";
+				<< ") .. controls +(west:1.8) and +(north west:1.8) .. ("
+				<< &leafs[node->leaf] << ");\n";
 		}
 
 		// left child
-		if(node->left->type == INTERNAL){
-			recursive_helper(static_cast<Internal*>(node->left));
+		if(IS_LEFT_INTERNAL(node)){
+			recursive_helper(&internals[node->left]);
 		} else {
-			leaf_printer(static_cast<Leaf*>(node->left));
+			leaf_printer(&leafs[node->left]);
 		}
 
 		// Insert line break - otherwise pdflatex breaks
 		output << "\n";
 
 		// right child
-		if(node->right->type == INTERNAL){
-			recursive_helper(static_cast<Internal*>(node->right));
+		if(IS_RIGHT_INTERNAL(node)){
+			recursive_helper(&internals[node->right]);
 		} else {
-			leaf_printer(static_cast<Leaf*>(node->right));
+			leaf_printer(&leafs[node->right]);
 		}
 
 		output << " ] ";
 	};
 
 	// Let's roll
-	if(root->type == INTERNAL){
-		recursive_helper(static_cast<Internal*>(root));
+	if(buildState == NORMAL){
+		recursive_helper(&internals[root]);
 	} else {
 		cerr << "PCTrieFast::get_qtree() root is just a leaf..." << endl;
 		abort();
@@ -412,7 +424,6 @@ string PCTrieFast::getQtreeSnapshot(){
 
 	output <<"\
 	\\end{tikzpicture}\n\
-	\\vspace{10pt}\n\
 %\n";
 	return output.str();
 };
@@ -423,10 +434,11 @@ void PCTrieFast::addQtreeSnapshot(){
 
 string PCTrieFast::finalizeQtree(string tree){
 	string output = "\
-\\documentclass[preview,multi={tikzpicture},border={5pt 5pt 5pt 5pt}]{standalone} \n \
+\\documentclass[preview,multi={tikzpicture},border={5pt 5pt 5pt 5pt}]{standalone} \n\
 %\n\
 \\usepackage{tikz}\n\
 \\usepackage{tikz-qtree}\n\
+\\tikzset{every tree node/.style={align=center,anchor=north}}\n\
 %\n\
 \\begin{document}\n\
 %\n";

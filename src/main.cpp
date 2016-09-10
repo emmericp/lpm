@@ -18,6 +18,7 @@
 //#include "dxr.hpp"
 #include "basicTrie.hpp"
 #include "pcTrie.hpp"
+#include "pcTrieFast.hpp"
 
 #define CHALLENGE_VERSION 1
 
@@ -67,7 +68,7 @@ void dump_challenge(Table& table, string filename){
 };
 
 void run_challenge(Table& table, string challenge_filename){
-#if 1
+#if 0
 	// read the challenge file
 	int fd = open(challenge_filename.c_str(), 0);
 	challenge_header header;
@@ -103,11 +104,11 @@ void run_challenge(Table& table, string challenge_filename){
 	//Naive lpm(table);
 	//BasicTrie lpm(table);
 #endif
-	PCTrie lpm(table);
-	cout << "Size of PCTrie: " << lpm.getSize()  / (1024*1024) << " MiB" << endl;
+	PCTrieFast lpm(table);
+	//cout << "Size of PCTrie: " << lpm.getSize()  / (1024*1024) << " MiB" << endl;
 
-	//lpm.getQtreeHistory();
-#if 1
+	cout << lpm.getQtreeHistory();
+#if 0
 	//lpm.print_expansion();
 	//lpm.print_tables();
 	clock_t start = clock();
