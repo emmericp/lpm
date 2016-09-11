@@ -74,7 +74,7 @@ public:
 			mask = PREFIX_MASK_64(num);
 			pos = 0;
 			while(__builtin_popcountll(mask) == num){
-				if(__builtin_popcountll(maps[cur] & mask) == num){
+				if(__builtin_popcountll(~maps[cur] & mask) == num){
 					goto found_map;
 				}
 				mask = mask >> 1;
