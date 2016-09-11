@@ -4,13 +4,7 @@ using namespace std;
 
 #define TRIE_NULL 0xffffffff
 
-/*
-void PCTrieFast::Leaf::pushRoute(
-		uint32_t pos,
-		struct NextHop e,
-		struct PCTrieFast::Leaf* leafs,
-		struct NextHop* nextHops,
-		Allocator<struct NextHop>& nextHops_alloc){ */
+// TODO erase old data
 void PCTrieFast::Leaf::pushRoute(
 		struct NextHop e,
 		struct NextHop* nextHops,
@@ -196,6 +190,12 @@ void PCTrieFast::buildTrie() {
 					leafs[internals[new_int_p->left].leaf].hasMoreGeneralRoute(nextHops, len)){
 				new_int_p->leaf = internals[new_int_p->left].leaf;
 				internals[new_int_p->left].leaf = TRIE_NULL;
+			}
+
+			if(cur.is_internal){
+				internals[cur.pos].parent = new_int_pos;
+			} else {
+				leafs[cur.pos].parent = new_int_pos;
 			}
 
 			// Are we dealing with the root node?

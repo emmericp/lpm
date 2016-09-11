@@ -107,8 +107,9 @@ void run_challenge(Table& table, string challenge_filename){
 	PCTrieFast lpm(table);
 	//cout << "Size of PCTrie: " << lpm.getSize()  / (1024*1024) << " MiB" << endl;
 
-	//cout << lpm.getQtreeHistory();
-#if 1
+#if 0
+	cout << lpm.getQtreeHistory();
+#else
 	//lpm.print_expansion();
 	//lpm.print_tables();
 	clock_t start = clock();

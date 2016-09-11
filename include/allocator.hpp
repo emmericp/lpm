@@ -91,7 +91,7 @@ found_map:
 			std::abort();
 		}
 
-		memcpy(array + (cur*64) + pos, &obj, sizeof(T) * num);
+		memcpy(array + (cur*64) + pos, obj, sizeof(T) * num);
 		maps[cur] |= mask;
 
 		return (cur*64) + pos;
